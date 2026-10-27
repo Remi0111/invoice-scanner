@@ -69,19 +69,19 @@
       <div id="reader"></div>
     </div>
     
-    <button type="button" id="scanBtn" class="btn btn-primary" onclick="initScanner()">📷 開啟相機即時掃描</button>
+    <button type="button" id="scanBtn" class="btn btn-primary" onclick="initScanner()">📷 開啟相機</button>
     <button type="button" id="stopBtn" class="btn btn-danger" onclick="stopScanner()">⏹ 關閉相機</button>
 
-    <!-- 活動名稱 -->
+    <!-- 活動日期+名稱 -->
     <div class="form-group">
-      <label for="activityName">活動名稱</label>
+      <label for="activityName">活動日期+名稱</label>
       <input type="text" id="activityName" placeholder="例如：0111雷米一番会社" required>
     </div>
 
     <!-- 發票解析資訊（日期自動帶入） -->
     <div class="row">
       <div class="form-group">
-        <label for="invoiceDate">發票日期</label>
+        <label for="invoiceDate">發票日期 (自動帶入)</label>
         <input type="date" id="invoiceDate" required>
       </div>
       <div class="form-group">
@@ -91,7 +91,7 @@
     </div>
 
     <div class="form-group">
-      <label for="sellerName">開立單位 / 店家</label>
+      <label for="sellerName">開立單位 / 店家 (請手動填寫)</label>
       <input type="text" id="sellerName" placeholder="例如：7-ELEVEN" required>
     </div>
 
@@ -99,16 +99,16 @@
     <div class="form-group">
       <label for="note">備註分類（選填）</label>
       <select id="note">
-        <option value="">-- 請選擇備註（可不選） --</option>
+        <option value="">-- 請選擇備註 --</option>
         <option value="餐食">餐食</option>
         <option value="交通">交通</option>
         <option value="輸出">輸出</option>
         <option value="雜支">雜支</option>
-        <option value="無單據">無單據證明</option>
+        <option value="無單據">無單據</option>
       </select>
     </div>
 
-    <button type="submit" id="submitBtn" class="btn btn-secondary">💾 確認登錄單據</button>
+    <button type="submit" id="submitBtn" class="btn btn-secondary">💾 確認登錄</button>
   </form>
 
   <div id="statusMsg"></div>
