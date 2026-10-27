@@ -56,11 +56,11 @@
       </select>
     </div>
 
-    <!-- 鏡頭切換清單（動態偵測手機所有相機） -->
+    <!-- 後置鏡頭切換清單 -->
     <div class="camera-select-box" id="cameraSelectBox">
-      <label for="cameraSelect" style="color: #333;">📷 選擇相機鏡頭（可切換測試）</label>
+      <label for="cameraSelect" style="color: #333;">📷 選擇後置鏡頭</label>
       <select id="cameraSelect" onchange="switchCamera()">
-        <option value="">-- 載入可用鏡頭中 --</option>
+        <option value="">-- 載入後置鏡頭中 --</option>
       </select>
     </div>
 
@@ -78,7 +78,7 @@
       <input type="text" id="activityName" placeholder="例如：0908中信房屋" required>
     </div>
 
-    <!-- 發票解析資訊 -->
+    <!-- 發票解析資訊（日期自動帶入） -->
     <div class="row">
       <div class="form-group">
         <label for="invoiceDate">發票日期</label>
@@ -125,7 +125,7 @@
   let html5QrCode = null;
   let currentCameraId = null;
 
-  // 初始化並取得手機所有相機清單
+  // 初始化並過濾僅保留後置鏡頭
   function initScanner() {
     const wrapper = document.getElementById('scannerWrapper');
     const selectBox = document.getElementById('cameraSelectBox');
@@ -138,28 +138,32 @@
 
     Html5Qrcode.getCameras().then(devices => {
       if (devices && devices.length) {
+        // 過濾掉前鏡頭，只保留後置鏡頭 (facing back / environment)
+        const backCameras = devices.filter(device => {
+          const label = (device.label || "").toLowerCase();
+          return label.includes('back') || label.includes('rear') || label.includes('environment') || (!label.includes('front') && !label.includes('user'));
+        });
+
+        // 如果過濾後沒有符合的，就退回使用全部鏡頭但排除明確的前鏡頭
+        const availableCameras = backCameras.length > 0 ? backCameras : devices.filter(d => !(d.label || "").toLowerCase().includes('front'));
+
         const select = document.getElementById('cameraSelect');
         select.innerHTML = "";
         
-        devices.forEach((device, index) => {
+        availableCameras.forEach((device, index) => {
           const option = document.createElement('option');
           option.value = device.id;
-          // 嘗試判斷後置鏡頭
-          let label = device.label || `相機鏡頭 ${index + 1}`;
-          if (label.toLowerCase().includes('back') || label.toLowerCase().includes('rear') || label.toLowerCase().includes('environment') || index === 0) {
-            if (index === 0 && !currentCameraId) currentCameraId = device.id;
-          }
-          option.text = label;
+          option.text = device.label || `後置鏡頭 ${index + 1}`;
           select.appendChild(option);
         });
 
-        // 預設選擇第一個鏡頭（通常為主鏡頭）
-        if (!currentCameraId && devices.length > 0) {
-          currentCameraId = devices[0].id;
+        if (availableCameras.length > 0) {
+          currentCameraId = availableCameras[0].id;
+          select.value = currentCameraId;
+          startCamera(currentCameraId);
+        } else {
+          showStatus("找不到可用的後置鏡頭", "error");
         }
-        select.value = currentCameraId;
-
-        startCamera(currentCameraId);
       } else {
         showStatus("找不到可用的相機裝置", "error");
       }
@@ -168,7 +172,6 @@
     });
   }
 
-  // 啟動指定 ID 的相機
   function startCamera(cameraId) {
     if (html5QrCode.isScanning) {
       html5QrCode.stop().then(() => {
@@ -186,13 +189,12 @@
       config,
       onScanSuccess
     ).then(() => {
-      showStatus("📷 相機運作中，請對準發票 QR Code", "");
+      showStatus("📷 後置鏡頭掃描中，請對準發票 QR Code", "");
     }).catch(err => {
-      showStatus("啟動此鏡頭失敗，請嘗試切換其他鏡頭。", "error");
+      showStatus("啟動此鏡頭失敗，請切換其他後置鏡頭。", "error");
     });
   }
 
-  // 下拉選單切換相機
   function switchCamera() {
     const select = document.getElementById('cameraSelect');
     currentCameraId = select.value;
@@ -213,19 +215,21 @@
     }
   }
 
+  // 掃描成功自動帶入日期與金額
   function onScanSuccess(decodedText) {
     if (decodedText.length >= 21) {
       try {
         const dateStr = decodedText.substring(10, 17);
         const year = parseInt(dateStr.substring(0, 3), 10) + 1911;
-        const month = decodedText.substring(3, 5);
-        const day = decodedText.substring(5, 7);
+        const month = dateStr.substring(3, 5);
+        const day = dateStr.substring(5, 7);
         const formattedDate = `${year}-${month}-${day}`;
 
         let hexAmount = decodedText.substring(29, 37);
         let amount = parseInt(hexAmount, 16);
         if (isNaN(amount)) amount = "";
 
+        // 自動帶入日期與金額
         document.getElementById('invoiceDate').value = formattedDate;
         if (amount) document.getElementById('amount').value = amount;
 
