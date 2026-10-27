@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>發票登錄系統</title>
+  <!-- 引入 QR Code 掃描庫 -->
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: #f4f6f9; margin: 0; padding: 16px; color: #333; }
+    .card { background: #fff; border-radius: 16px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); max-width: 480px; margin: 0 auto; }
+    h2 { font-size: 1.3rem; margin-top: 0; text-align: center; color: #1a73e8; font-weight: 700; }
+    .scanner-container { position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #000; margin-bottom: 16px; min-height: 250px; display: none; }
+    #reader { width: 100%; }
+    .btn { display: block; width: 100%; padding: 14px; border: none; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; text-align: center; transition: 0.2s; }
+    .btn-primary { background-color: #1a73e8; color: white; margin-bottom: 12px; }
+    .btn-secondary { background-color: #34a853; color: white; margin-top: 8px; }
+    .btn-danger { background-color: #ea4335; color: white; margin-bottom: 12px; display: none; }
+    .btn:active { transform: scale(0.98); opacity: 0.9; }
+    .form-group { margin-bottom: 14px; }
+    label { font-size: 0.85rem; font-weight: 600; color: #5f6368; display: block; margin-bottom: 6px; }
+    input, select { width: 100%; padding: 12px; border: 1.5px solid #dadce0; border-radius: 8px; font-size: 1rem; outline: none; background: #fff; }
+    input:focus, select:focus { border-color: #1a73e8; }
+    .row { display: flex; gap: 10px; }
+    .row .form-group { flex: 1; }
+    #statusMsg { font-size: 0.9rem; text-align: center; margin-top: 12px; font-weight: 600; line-height: 1.4; }
+    .success { color: #34a853; background: #e6f4ea; padding: 8px; border-radius: 6px; }
+    .error { color: #ea4335; background: #fce8e6; padding: 8px; border-radius: 6px; }
+    .highlight-box { background: #e8f0fe; padding: 10px; border-radius: 8px; margin-bottom: 14px; }
+    .security-box { background: #fef7e0; padding: 10px; border-radius: 8px; margin-bottom: 14px; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h2>🧾 發票登錄系統</h2>
+
+  <form id="invoiceForm" onsubmit="submitForm(event)">
+    
+    <!-- 授權密鑰欄位 -->
+    <div class="security-box form-group">
+      <label for="secretKey" style="color: #b06000;">🔐 系統登錄密鑰（授權碼）</label>
+      <input type="password" id="secretKey" placeholder="請輸入授權密鑰" required>
+    </div>
+
+    <!-- 選擇登錄月份 -->
+    <div class="highlight-box form-group">
+      <label for="targetMonth" style="color: #1a73e8;">📅 選擇登錄月份（試算表分頁）</label>
+      <select id="targetMonth" required>
+        <option value="2026-09">2026年 09月</option>
+        <option value="2026-10" selected>2026年 10月</option>
+        <option value="2026-11">2026年 11月</option>
+        <option value="2026-12">2026年 12月</option>
+      </select>
+    </div>
+
+    <!-- 即時相機掃描區塊 -->
+    <div class="scanner-container" id="scannerWrapper">
+      <div id="reader"></div>
+    </div>
+    <button type="button" id="scanBtn" class="btn btn-primary" onclick="toggleScanner()">📷 開啟相機即時掃描</button>
+    <button type="button" id="stopBtn" class="btn btn-danger" onclick="stopScanner()">⏹ 關閉相機</button>
+
+    <!-- 出差活動名稱（改為自由輸入） -->
+    <div class="form-group">
+      <label for="activityName">出差活動名稱</label>
+      <input type="text" id="activityName" placeholder="例如：0908中信房屋" required>
+    </div>
+
+    <!-- 發票解析資訊 -->
+    <div class="row">
+      <div class="form-group">
+        <label for="invoiceDate">發票日期</label>
+        <input type="date" id="invoiceDate" required>
+      </div>
+      <div class="form-group">
+        <label for="amount">總金額 ($)</label>
+        <input type="number" id="amount" placeholder="135" required>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="sellerName">開立單位 / 店家</label>
+      <input type="text" id="sellerName" placeholder="例如：7-ELEVEN" required>
+    </div>
+
+    <!-- 備註選單 -->
+    <div class="form-group">
+      <label for="note">備註分類（選填）</label>
+      <select id="note">
+        <option value="">-- 請選擇備註（可不選） --</option>
+        <option value="餐食">餐食</option>
+        <option value="交通">交通</option>
+        <option value="輸出">輸出</option>
+        <option value="雜支">雜支</option>
+        <option value="無單據">無單據證明</option>
+      </select>
+    </div>
+
+    <button type="submit" id="submitBtn" class="btn btn-secondary">💾 確認登錄單據</button>
+  </form>
+
+  <div id="statusMsg"></div>
+</div>
+
+<script>
+  // 🔴 請在此處填入你剛剛從 Apps Script 部署取得的網頁應用程式 URL
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbw9q0CyhkK2jdShl2wr5wObm1pNQBlyMbIKtBRt5dnYeGQ1hqFqCALrlEp_CCour8BAVw/exec";
+
+  // 自動記住密鑰，方便手機下次使用
+  window.addEventListener('DOMContentLoaded', () => {
+    const savedKey = localStorage.getItem('invoice_secret_key');
+    if (savedKey) document.getElementById('secretKey').value = savedKey;
+  });
+
+  let html5QrCode = null;
+  let isScanning = false;
+
+  function toggleScanner() {
+    if (isScanning) {
+      stopScanner();
+    } else {
+      startScanner();
+    }
+  }
+
+  function startScanner() {
+    const wrapper = document.getElementById('scannerWrapper');
+    wrapper.style.display = 'block';
+    document.getElementById('scanBtn').style.display = 'none';
+    document.getElementById('stopBtn').style.display = 'block';
+
+    html5QrCode = new Html5Qrcode("reader");
+    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+    html5QrCode.start(
+      { facingMode: "environment" },
+      config,
+      onScanSuccess
+    ).then(() => {
+      isScanning = true;
+      showStatus("正在對準發票左側 QR Code...", "");
+    }).catch(err => {
+      showStatus("無法開啟相機權限，請確認瀏覽器已允許相機。", "error");
+      stopScanner();
+    });
+  }
+
+  function stopScanner() {
+    if (html5QrCode && isScanning) {
+      html5QrCode.stop().then(() => {
+        isScanning = false;
+        document.getElementById('scannerWrapper').style.display = 'none';
+        document.getElementById('scanBtn').style.display = 'block';
+        document.getElementById('stopBtn').style.display = 'none';
+      }).catch(err => console.error(err));
+    } else {
+      document.getElementById('scannerWrapper').style.display = 'none';
+      document.getElementById('scanBtn').style.display = 'block';
+      document.getElementById('stopBtn').style.display = 'none';
+    }
+  }
+
+  // 僅萃取 QR Code 純文字中的日期與金額，絕不上傳影像
+  function onScanSuccess(decodedText) {
+    if (decodedText.length >= 21) {
+      try {
+        const dateStr = decodedText.substring(10, 17);
+        const year = parseInt(dateStr.substring(0, 3), 10) + 1911;
+        const month = dateStr.substring(3, 5);
+        const day = dateStr.substring(5, 7);
+        const formattedDate = `${year}-${month}-${day}`;
+
+        let hexAmount = decodedText.substring(29, 37);
+        let amount = parseInt(hexAmount, 16);
+        if (isNaN(amount)) amount = "";
+
+        document.getElementById('invoiceDate').value = formattedDate;
+        if (amount) document.getElementById('amount').value = amount;
+
+        showStatus(`✅ 掃描成功！日期：${formattedDate}，金額：${amount || '請手動確認'}`, "success");
+        stopScanner();
+      } catch (e) {
+        showStatus("解析失敗，請手動填寫。", "error");
+      }
+    } else {
+      showStatus("請掃描電子發票「左側」的 QR Code", "error");
+    }
+  }
+
+  function submitForm(e) {
+    e.preventDefault();
+    const secretKey = document.getElementById('secretKey').value;
+    localStorage.setItem('invoice_secret_key', secretKey);
+
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = true;
+    submitBtn.innerText = "⏳ 登錄中...";
+
+    const formData = {
+      secretKey: secretKey,
+      targetMonth: document.getElementById('targetMonth').value,
+      activityName: document.getElementById('activityName').value,
+      invoiceDate: document.getElementById('invoiceDate').value,
+      amount: document.getElementById('amount').value,
+      sellerName: document.getElementById('sellerName').value,
+      note: document.getElementById('note').value
+    };
+
+    fetch(GAS_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formData)
+    }).then(() => {
+      submitBtn.disabled = false;
+      submitBtn.innerText = "💾 確認登錄單據";
+      showStatus("🎉 請求已送出！資料已安全寫入試算表。", "success");
+      document.getElementById('amount').value = '';
+      document.getElementById('sellerName').value = '';
+      document.getElementById('note').value = '';
+    }).catch(err => {
+      submitBtn.disabled = false;
+      submitBtn.innerText = "💾 確認登錄單據";
+      showStatus("❌ 寫入失敗：" + err, "error");
+    });
+  }
+
+  function showStatus(msg, type) {
+    const el = document.getElementById('statusMsg');
+    el.innerText = msg;
+    el.className = type;
+  }
+</script>
+
+</body>
+</html>
