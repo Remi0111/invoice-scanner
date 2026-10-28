@@ -122,6 +122,34 @@
     if (savedKey) document.getElementById('secretKey').value = savedKey;
   });
 
+  // 監聽發票日期的變動，自動同步更新「登錄月份」下拉選單
+document.getElementById('invoiceDate').addEventListener('change', function() {
+  const dateVal = this.value; // 格式例如 "2026-11-26"
+  if (dateVal) {
+    const yearMonth = dateVal.substring(0, 7); // 取出 "2026-11"
+    const targetMonthSelect = document.getElementById('targetMonth');
+    
+    // 檢查下拉選單中有沒有這個月份的選項，如果沒有就動態新增一個
+    let optionExists = false;
+    for (let i = 0; i < targetMonthSelect.options.length; i++) {
+      if (targetMonthSelect.options[i].value === yearMonth) {
+        optionExists = true;
+        break;
+      }
+    }
+    
+    if (!optionExists) {
+      const newOption = document.createElement('option');
+      newOption.value = yearMonth;
+      const parts = yearMonth.split('-');
+      newOption.text = `${parts[0]}年 ${parts[1]}月`;
+      targetMonthSelect.add(newOption);
+    }
+    
+    // 自動選中對應的月份
+    targetMonthSelect.value = yearMonth;
+  }
+});
   let html5QrCode = null;
   let currentCameraId = null;
 
